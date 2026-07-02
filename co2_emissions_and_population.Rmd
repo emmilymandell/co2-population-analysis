@@ -1,0 +1,178 @@
+---
+title: "The Relationship Between CO2 Emissions and Population Growth"
+author: "Emmily Mandell, Isabella Jiang, Amber Kirkpatrick"
+output: 
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width = 8, fig.height = 5)
+library(tidyverse)
+library(scales)
+library(broom)
+```
+
+
+## Introduction
+
+As global climate change accelerates, identifying the macroeconomic drivers of carbon emissions is necessary for policy creation. Population growth is frequently cited as a primary driver due to scaling energy and industrial demands. This project evaluates a fundamental question: Is annual country-level population change a statistically significant predictor of changes in annual $CO_2$ emissions?
+
+We hypothesize that country-specific population growth is positively correlated with increases in $CO_2$ emissions. By exploring this relationship longitudinally across 180 countries, we aim to quantify the scale of this environmental impact.
+
+## Data Background & Preprocessing
+
+This analysis integrates two primary open-source datasets spanning 1961 to 2023:
+
+1. Global Population Data: Sourced from the World Bank, providing annual census derived total populations per country. ^[https://data.worldbank.org/indicator/SP.POP.TOTL]
+
+2. Annual $CO_2$ Emissions: Sourced from Our World in Data (Global Carbon Budget) measuring annual industrial and fossil fuel $CO_2$ output per country in tons. ^[https://ourworldindata.org/grapher/annual-co2-emissions-per-country]
+
+### Data Pipeline and Feature Engineering
+
+To create our data set we joined the population dataset and the carbon emissions dataset by country within the span that there is full data for both sets, which was 1961 to 2023. The resulting dataset had four variables, country name, year, annual CO2 emissions, and population, and was in tidy format with one row for each country and year combination.
+
+To evaluate true year-over-year adjustments rather than simple absolute growth trends, we calculate the absolute first differences ($\Delta$) for both metrics, grouped strictly by country to prevent cross-border data contamination.
+
+```{r}
+#load raw data
+co2_emission = read_csv("data/annual-co2-emissions-per-country.csv")
+population = read_csv("data/global_population.csv")
+
+#clean and reshape population data
+population_long = population %>%
+  pivot_longer(cols = matches("^(19|20)\\d{2}$"), 
+               names_to = "Year", 
+               values_to = "Population") %>%
+  mutate(Year = as.integer(Year)) %>%
+  select(`Country Name`, Year, Population)
+
+#clean CO2 data
+co2_clean = co2_emission %>%
+  filter(Year >= 1960) %>%
+  rename(`Country Name` = Entity, `CO2_Emissions` = `Annual CO₂ emissions`) %>%
+  mutate(Year = as.integer((Year))) %>%
+  select(`Country Name`, Year, CO2_Emissions)
+
+#join data and engineer first difference features
+df_cleaned = inner_join(population_long, co2_clean, by = c("Country Name", "Year")) %>%
+  arrange(`Country Name`, Year) %>%
+  group_by(`Country Name`) %>%
+  mutate(population_change = Population - lag(Population),
+         co2_change = CO2_Emissions - lag(CO2_Emissions)) %>%
+  ungroup() %>%
+  filter(!is.na(population_change) & !is.na(co2_change))
+
+#summary statistics
+total_countries = n_distinct(df_cleaned$`Country Name`)
+total_obs = nrow(df_cleaned)
+```
+
+The resulting dataset yields `r total_obs` observations across `r total_countries` countries over a 61-year period.
+
+## Exploratory Data Analysis (EDA)
+
+Understanding the connection between population growth and carbon dioxide emissions involves contextual knowledge and causality. Population growth affects human activities, which may result in greater energy consumption that in turn leads to increased carbon dioxide emissions.
+
+### Macro Trends: Global Population vs. Total Emissions
+
+Before evaluating annual differentials, we aggregated the data globally to assess macro level trajectories in population and $CO_2$ emissions. The graph below displays the global trends in population and $CO_2$ emissions by year.
+
+```{r}
+#aggregate global data
+global_trends = df_cleaned %>%
+  group_by(Year) %>%
+  summarize(Total_CO2_Billion_Tons = sum(CO2_Emissions, na.rm = TRUE) / 1e9,
+            Total_Pop_Billion = sum(Population, na.rm = TRUE) / 1e9)
+
+#plot global trends
+ggplot(global_trends, aes(x = Year)) +
+  geom_line(aes(y = Total_CO2_Billion_Tons, color = "CO2 Emissions"), size = 1) +
+  geom_line(aes(y = Total_Pop_Billion, color = "Population"), size = 1) +
+  labs(title = "Global Population & CO2 Emissions (1961–2022)",
+       y = "CO2 Emissions Tons/ Population (Billions)",
+       x = "Year",
+       color = "Metric") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+This graph shows a consistent growth in both $CO_2$ emissions and population from 1960 to 2022. While both curves rise continuously over the period, global $CO_2$ emissions display higher annual volatility compared to the highly stable, linear trajectory of population expansion.
+
+## Statistical Modeling
+
+We will analyze the data using a linear regression model to determine the strength of this relationship to gain greater insight into the impact of population growth on the environment.
+
+### Visualizing the Relationship
+
+To handle extreme variances among nations, we look at changes greater than zero using a logarithmic transformation to linearize the visualization. The plot below illustrates the relationship between population changes and $CO_2$ emissions changes, with linear regression line to indicate the trend.
+
+```{r}
+# filter for positive growth values to prevent log-transformation errors in visualization
+df_positive_growth = df_cleaned %>% 
+  filter(population_change > 0 & co2_change > 0)
+
+#plot 
+ggplot(df_positive_growth, aes(x = population_change, y = co2_change)) +
+  geom_point(alpha = 0.3, size = 0.6) + 
+  geom_smooth(method = "lm", se = TRUE) +
+  scale_x_log10(labels = label_comma()) + 
+  scale_y_log10(labels = label_comma()) +
+  labs(title = "Annual Growth Relationship: Population vs. CO2 Emission Changes",
+       x = "Annual Population Increase (Log Scale)",
+       y = "Annual CO2 Emission Increase in Tons (Log Scale)") +
+  theme_minimal()
+```
+
+### Regression Analysis
+
+Because the visualization maps a log-log scaling relationship, a true structural analysis requires a model matching that transformation strategy. We fit a linear model predicting $\log_{10}(\Delta CO_2)$ based on $\log_{10}(\Delta Population)$.
+
+```{r}
+#linear regression model
+fit_log = lm(log10(co2_change) ~ log10(population_change), data = df_positive_growth)
+model_summary = glance(fit_log)
+model_coeffs = tidy(fit_log)
+summary(fit_log)
+```
+
+### Model Interpretation
+
+Elasticity Coefficient ($\beta_1$): The model estimates a coefficient of `r round(model_coeffs$estimate[2], 3)`. In log-log models, this indicates that a 1% increase in a country's annual population growth rate corresponds to an approximate `r round(model_coeffs$estimate[2], 3)`% increase in their annual $CO_2$ emission growth.
+
+Goodness of Fit ($R^2$): The Adjusted $R^2$ is `r round(model_summary$adj.r.squared, 3)`, indicating that approximately `r round(model_summary$adj.r.squared * 100, 1)`% of the variance in positive annual $CO_2$ changes can be explained mathematically by annual population growth shifts.
+
+Significance: With a p-value of $< 2.2 \times 10^{-16}$, the relationship is highly statistically significant, soundly rejecting the null hypothesis that there is no relationship between $CO_2$ emissions and population.
+
+## Discussion
+
+### Limitations and Future Work
+While an $R^2$ of over 50% on a log-log level represents a meaningful relationship, we must acknowledge the limits of simple ordinary least squares (OLS) regression on panel data:
+
+- Omitted Variable Bias (OVB): Population growth acts alongside gross domestic product (GDP) growth, urbanization rates, energy grid compositions and other variables not included in this model that may also influence $CO_2$ emissions.
+
+- Temporal & Spatial Autocorrelation: Observations within the same country over sequential years are not independent. Future iterations should utilize Fixed-Effects Panel Models (plm package in R) to control for time-invariant country characteristics (e.g. geography, natural resource reserves).
+
+- Symmetry Check: The log-transform dropped cases where population or emissions shrank. A follow-up analysis could categorize countries into "growing" vs "shrinking" dynamics using raw variables.
+
+There were also some additional limitations in the data we used. We weren’t able to examine the relationship in a broader time range, due to a lack of data before 1960 for the variables used. Also, we could have narrowed down our data to only look at countries with more detailed data, but we wanted to look at the overall trend across the world, which had some data limitations.
+
+Based on this project, future research can explore additional questions such as:
+
+- How does increased CO2 emissions affect the overall health of the growing population?
+
+- Is there a correlation with increasing CO2 emissions and car sales? 
+
+- Is there this strong of a correlation for every country, as there is for the world as a whole?
+
+For an alternative method for this analysis, we could have set a hypothesis testing for the positive linear relationship between the two variables with null hypothesis being that there isn’t a positive linear relationship and alternative hypothesis being there is a relationship. 
+
+Additionally, looking at data such as fossil fuel consumption in comparison with both topics we already inspected would help us refined our understanding at the relationship. 
+
+### Conclusion
+This analysis demonstrates a powerful, mathematically trackable scaling effect between population growth and carbon emission rates internationally. For data science application, it establishes that changing demographic foundations can serve as strong baseline predictors for macro environmental resource loading.
+
+### References
