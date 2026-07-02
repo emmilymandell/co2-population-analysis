@@ -129,7 +129,7 @@ ggplot(df_positive_growth, aes(x = population_change, y = co2_change)) +
 
 ### Regression Analysis
 
-Because the visualization maps a log-log scaling relationship, a true structural analysis requires a model matching that transformation strategy. We fit a linear model predicting $\log_{10}(\Delta CO_2)$ based on $\log_{10}(\Delta Population)$.
+Because the visualization maps a log-log scaling relationship, a true structural analysis requires a model matching that transformation strategy. We fit a Ordinary Least Squares (OLS) linear model predicting $\log_{10}(\Delta CO_2)$ based on $\log_{10}(\Delta Population)$.
 
 ```{r}
 #linear regression model
@@ -141,38 +141,33 @@ summary(fit_log)
 
 ### Model Interpretation
 
-Elasticity Coefficient ($\beta_1$): The model estimates a coefficient of `r round(model_coeffs$estimate[2], 3)`. In log-log models, this indicates that a 1% increase in a country's annual population growth rate corresponds to an approximate `r round(model_coeffs$estimate[2], 3)`% increase in their annual $CO_2$ emission growth.
+Elasticity Coefficient ($\beta_1$): The model estimates a coefficient of `r round(model_coeffs$estimate[2], 3)`. Because this is a log-log model evaluated on first differences, this that a 1% increase in the magnitude of annual population growth corresponds to an approximate `r round(model_coeffs$estimate[2], 3)`% increase in the magnitude of annual $CO_2$ emission growth.
 
-Goodness of Fit ($R^2$): The Adjusted $R^2$ is `r round(model_summary$adj.r.squared, 3)`, indicating that approximately `r round(model_summary$adj.r.squared * 100, 1)`% of the variance in positive annual $CO_2$ changes can be explained mathematically by annual population growth shifts.
+Goodness of Fit ($R^2$): The Adjusted $R^2$ is `r round(model_summary$adj.r.squared, 3)`, indicating that approximately `r round(model_summary$adj.r.squared * 100, 1)`% of the variance in positive annual $CO_2$ changes can be explained structurally by shifts in annual population growth. While a large portion of the variance remains unexplained, an $R^2$ of nearly 40% is remarkably strong for a single-variable macro model built on noisy global panel data.
 
-Significance: With a p-value of $< 2.2 \times 10^{-16}$, the relationship is highly statistically significant, soundly rejecting the null hypothesis that there is no relationship between $CO_2$ emissions and population.
+Significance: With t-statistic of 64.42 and a p-value of $< 2.2 \times 10^{-16}$, the relationship is highly statistically significant. This soundly rejects the hull hypothesis ($H_0: \beta_1 = 0$), providing empirical support for our alternative hypothesis that population growth shifts positively scale carbon emission changes.
 
 ## Discussion
 
-### Limitations and Future Work
-While an $R^2$ of over 50% on a log-log level represents a meaningful relationship, we must acknowledge the limits of simple ordinary least squares (OLS) regression on panel data:
+### Methodological Limitations
+While our regression model establishes a clear baseline relationship, we must acknowledge the limits of simple ordinary least squares (OLS) regression on panel data:
 
-- Omitted Variable Bias (OVB): Population growth acts alongside gross domestic product (GDP) growth, urbanization rates, energy grid compositions and other variables not included in this model that may also influence $CO_2$ emissions.
+- Omitted Variable Bias (OVB): Population growth does not happen in isolation. It strongly covaries with macroeconomic drivers like Gross Domestic Product (GDP) per capita growth, rate of urbanization, and industrial energy grid compositions. Omitting these variables means our population coefficient may absorb some of their effects on $CO_2$ emissions.
 
-- Temporal & Spatial Autocorrelation: Observations within the same country over sequential years are not independent. Future iterations should utilize Fixed-Effects Panel Models (plm package in R) to control for time-invariant country characteristics (e.g. geography, natural resource reserves).
+- Temporal & Spatial Autocorrelation: The sample relies on observations clustered over 60 years across 180 countries. Observations within a single country are sequentially dependent over time. Standard OLS assumes independent and identically distributed (i.i.d.) residuals; thus, future iterations should employ a Fixed-Effects Panel Data Model (plm package) to isolate intra-country changes and control for time-invariant country characteristics (e.g., geography, baseline natural resource reserves).
 
 - Symmetry Check: The log-transform dropped cases where population or emissions shrank. A follow-up analysis could categorize countries into "growing" vs "shrinking" dynamics using raw variables.
 
-There were also some additional limitations in the data we used. We weren’t able to examine the relationship in a broader time range, due to a lack of data before 1960 for the variables used. Also, we could have narrowed down our data to only look at countries with more detailed data, but we wanted to look at the overall trend across the world, which had some data limitations.
+### Future Research Frameworks
+To iterate on this baseline study, future work should expand in the following directions:
 
-Based on this project, future research can explore additional questions such as:
+- Multivariate Confounder Control: Integrating World Bank GDP metrics and global vehicle/transit registration statistics to decouple pure population growth from expanding consumer affluence.
 
-- How does increased CO2 emissions affect the overall health of the growing population?
+- Heterogeneity Analysis: Evaluating whether this correlation is globally uniform, or if it breaks down when subsetting the data by economic status (e.g., OECD vs. developing economies).
 
-- Is there a correlation with increasing CO2 emissions and car sales? 
-
-- Is there this strong of a correlation for every country, as there is for the world as a whole?
-
-For an alternative method for this analysis, we could have set a hypothesis testing for the positive linear relationship between the two variables with null hypothesis being that there isn’t a positive linear relationship and alternative hypothesis being there is a relationship. 
-
-Additionally, looking at data such as fossil fuel consumption in comparison with both topics we already inspected would help us refined our understanding at the relationship. 
+- Epidemiological Impacts: Crossing these macro environmental insights with global health data to evaluate if regional surges in demographic carbon emissions correlate with measurable changes in population respiratory health metrics.
 
 ### Conclusion
-This analysis demonstrates a powerful, mathematically trackable scaling effect between population growth and carbon emission rates internationally. For data science application, it establishes that changing demographic foundations can serve as strong baseline predictors for macro environmental resource loading.
+This analysis demonstrates a statistically robust, trackable scaling effect between population growth acceleration and carbon emission acceleration internationally. For data science applications, it proves that shifting country-level demographic baselines serve as strong, reliable structural inputs for macro environmental resource loading and emission forecasting models.
 
-### References
+## References

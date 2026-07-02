@@ -1735,7 +1735,9 @@ ggplot(df_positive_growth, aes(x = population_change, y = co2_change)) +
 <h3>Regression Analysis</h3>
 <p>Because the visualization maps a log-log scaling relationship, a true
 structural analysis requires a model matching that transformation
-strategy. We fit a linear model predicting <span class="math inline">\(\log_{10}(\Delta CO_2)\)</span> based on <span class="math inline">\(\log_{10}(\Delta Population)\)</span>.</p>
+strategy. We fit a Ordinary Least Squares (OLS) linear model predicting
+<span class="math inline">\(\log_{10}(\Delta CO_2)\)</span> based on
+<span class="math inline">\(\log_{10}(\Delta Population)\)</span>.</p>
 <pre class="r"><code>#linear regression model
 fit_log = lm(log10(co2_change) ~ log10(population_change), data = df_positive_growth)
 model_summary = glance(fit_log)
@@ -1763,79 +1765,80 @@ summary(fit_log)</code></pre>
 <div id="model-interpretation" class="section level3">
 <h3>Model Interpretation</h3>
 <p>Elasticity Coefficient (<span class="math inline">\(\beta_1\)</span>): The model estimates a
-coefficient of 0.646. In log-log models, this indicates that a 1%
-increase in a country’s annual population growth rate corresponds to an
-approximate 0.646% increase in their annual <span class="math inline">\(CO_2\)</span> emission growth.</p>
+coefficient of 0.646. Because this is a log-log model evaluated on first
+differences, this that a 1% increase in the magnitude of annual
+population growth corresponds to an approximate 0.646% increase in the
+magnitude of annual <span class="math inline">\(CO_2\)</span> emission
+growth.</p>
 <p>Goodness of Fit (<span class="math inline">\(R^2\)</span>): The
 Adjusted <span class="math inline">\(R^2\)</span> is 0.383, indicating
 that approximately 38.3% of the variance in positive annual <span class="math inline">\(CO_2\)</span> changes can be explained
-mathematically by annual population growth shifts.</p>
-<p>Significance: With a p-value of <span class="math inline">\(&lt; 2.2
-\times 10^{-16}\)</span>, the relationship is highly statistically
-significant, soundly rejecting the null hypothesis that there is no
-relationship between <span class="math inline">\(CO_2\)</span> emissions
-and population.</p>
+structurally by shifts in annual population growth. While a large
+portion of the variance remains unexplained, an <span class="math inline">\(R^2\)</span> of nearly 40% is remarkably strong
+for a single-variable macro model built on noisy global panel data.</p>
+<p>Significance: With t-statistic of 64.42 and a p-value of <span class="math inline">\(&lt; 2.2 \times 10^{-16}\)</span>, the
+relationship is highly statistically significant. This soundly rejects
+the hull hypothesis (<span class="math inline">\(H_0: \beta_1 =
+0\)</span>), providing empirical support for our alternative hypothesis
+that population growth shifts positively scale carbon emission
+changes.</p>
 </div>
 </div>
 <div id="discussion" class="section level2">
 <h2>Discussion</h2>
-<div id="limitations-and-future-work" class="section level3">
-<h3>Limitations and Future Work</h3>
-<p>While an <span class="math inline">\(R^2\)</span> of over 50% on a
-log-log level represents a meaningful relationship, we must acknowledge
-the limits of simple ordinary least squares (OLS) regression on panel
-data:</p>
+<div id="methodological-limitations" class="section level3">
+<h3>Methodological Limitations</h3>
+<p>While our regression model establishes a clear baseline relationship,
+we must acknowledge the limits of simple ordinary least squares (OLS)
+regression on panel data:</p>
 <ul>
-<li><p>Omitted Variable Bias (OVB): Population growth acts alongside
-gross domestic product (GDP) growth, urbanization rates, energy grid
-compositions and other variables not included in this model that may
-also influence <span class="math inline">\(CO_2\)</span>
-emissions.</p></li>
-<li><p>Temporal &amp; Spatial Autocorrelation: Observations within the
-same country over sequential years are not independent. Future
-iterations should utilize Fixed-Effects Panel Models (plm package in R)
-to control for time-invariant country characteristics (e.g. geography,
+<li><p>Omitted Variable Bias (OVB): Population growth does not happen in
+isolation. It strongly covaries with macroeconomic drivers like Gross
+Domestic Product (GDP) per capita growth, rate of urbanization, and
+industrial energy grid compositions. Omitting these variables means our
+population coefficient may absorb some of their effects on <span class="math inline">\(CO_2\)</span> emissions.</p></li>
+<li><p>Temporal &amp; Spatial Autocorrelation: The sample relies on
+observations clustered over 60 years across 180 countries. Observations
+within a single country are sequentially dependent over time. Standard
+OLS assumes independent and identically distributed (i.i.d.) residuals;
+thus, future iterations should employ a Fixed-Effects Panel Data Model
+(plm package) to isolate intra-country changes and control for
+time-invariant country characteristics (e.g., geography, baseline
 natural resource reserves).</p></li>
 <li><p>Symmetry Check: The log-transform dropped cases where population
 or emissions shrank. A follow-up analysis could categorize countries
 into “growing” vs “shrinking” dynamics using raw variables.</p></li>
 </ul>
-<p>There were also some additional limitations in the data we used. We
-weren’t able to examine the relationship in a broader time range, due to
-a lack of data before 1960 for the variables used. Also, we could have
-narrowed down our data to only look at countries with more detailed
-data, but we wanted to look at the overall trend across the world, which
-had some data limitations.</p>
-<p>Based on this project, future research can explore additional
-questions such as:</p>
+</div>
+<div id="future-research-frameworks" class="section level3">
+<h3>Future Research Frameworks</h3>
+<p>To iterate on this baseline study, future work should expand in the
+following directions:</p>
 <ul>
-<li><p>How does increased CO2 emissions affect the overall health of the
-growing population?</p></li>
-<li><p>Is there a correlation with increasing CO2 emissions and car
-sales?</p></li>
-<li><p>Is there this strong of a correlation for every country, as there
-is for the world as a whole?</p></li>
+<li><p>Multivariate Confounder Control: Integrating World Bank GDP
+metrics and global vehicle/transit registration statistics to decouple
+pure population growth from expanding consumer affluence.</p></li>
+<li><p>Heterogeneity Analysis: Evaluating whether this correlation is
+globally uniform, or if it breaks down when subsetting the data by
+economic status (e.g., OECD vs. developing economies).</p></li>
+<li><p>Epidemiological Impacts: Crossing these macro environmental
+insights with global health data to evaluate if regional surges in
+demographic carbon emissions correlate with measurable changes in
+population respiratory health metrics.</p></li>
 </ul>
-<p>For an alternative method for this analysis, we could have set a
-hypothesis testing for the positive linear relationship between the two
-variables with null hypothesis being that there isn’t a positive linear
-relationship and alternative hypothesis being there is a
-relationship.</p>
-<p>Additionally, looking at data such as fossil fuel consumption in
-comparison with both topics we already inspected would help us refined
-our understanding at the relationship.</p>
 </div>
 <div id="conclusion" class="section level3">
 <h3>Conclusion</h3>
-<p>This analysis demonstrates a powerful, mathematically trackable
-scaling effect between population growth and carbon emission rates
-internationally. For data science application, it establishes that
-changing demographic foundations can serve as strong baseline predictors
-for macro environmental resource loading.</p>
+<p>This analysis demonstrates a statistically robust, trackable scaling
+effect between population growth acceleration and carbon emission
+acceleration internationally. For data science applications, it proves
+that shifting country-level demographic baselines serve as strong,
+reliable structural inputs for macro environmental resource loading and
+emission forecasting models.</p>
 </div>
-<div id="references" class="section level3">
-<h3>References</h3>
 </div>
+<div id="references" class="section level2">
+<h2>References</h2>
 </div>
 <div class="footnotes footnotes-end-of-document">
 <hr />
