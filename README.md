@@ -19,13 +19,15 @@ The project constructs an automated data-joining and preprocessing pipeline util
 
 ### Feature Engineering Pipeline:
 To circumvent spurious correlation common in absolute time-series data (where variables trend upward simply due to the passage of time), the pipeline transitions raw metrics into absolute first-differences ($\Delta$) isolated sequentially within country groups:
+
 $$\Delta \text{Population} = \text{Population}_t - \text{Population}_{t-1}$$
-$$\Delta \text{CO}_2 \text{ Emissions} = \text{CO}_{2, t} - \text{CO}_{2, t-1}$$
+
+$$\Delta \text{CO}_2\text{ Emissions} = \text{CO}_{2, t} - \text{CO}_{2, t-1}$$
 
 To linearize the relationship for OLS modeling and stabilize variance across vastly different country scales (e.g., China vs. small island nations), a $\log_{10}$ transformation was applied to observations displaying positive growth.
 
 ## Tech Stack & Analytical Ecosystem
-* Language:R (v4.3+)
+* Language: R (v4.3+)
 * Primary Libraries: 
   * `tidyverse` (Data manipulation, advanced reshaping, and group-nested parsing)
   * `ggplot2` (Custom thematic visualizations utilizing log scales)
